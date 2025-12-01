@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from jose import jwt
-from core.config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_DAYS
+from core.auth_config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_DAYS
 
 def create_access_token(data: dict):
     """Generate short-lived access token"""

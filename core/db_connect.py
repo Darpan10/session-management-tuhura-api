@@ -1,23 +1,19 @@
-import os
 from sqlalchemy import create_engine
-from dotenv import load_dotenv
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from config import settings  # your Pydantic settings
 
-# Load .env
-# env_path = Path(__file__).parent.parent / ".env"
-# load_dotenv(env_path)
+# Build the database URL from Pydantic settings
+DATABASE_URL = (
+    f"postgresql+psycopg2://{settings.db_user}:{settings.db_password}"
+    f"@{settings.db_host}:{settings.db_port}/{settings.db_name}"
+)
 
-load_dotenv()
-
-DB_USER = os.getenv("DB_USER")
-DB_PASSWORD = os.getenv("DB_PASSWORD")
-DB_HOST = os.getenv("DB_HOST")
-DB_PORT = os.getenv("DB_PORT", "5432")
-DB_NAME = os.getenv("DB_NAME")
-
-DATABASE_URL = f"postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-
+# Create SQLAlchemy engine
 engine = create_engine(DATABASE_URL, echo=True)
+
+# Create session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# Base class for declarative models
 Base = declarative_base()

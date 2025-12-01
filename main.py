@@ -9,7 +9,7 @@ from core.db_connect import Base, engine
 import logging
 
 from models.user import User,Role,UserRole
-
+from services.mail_service import MailService
 
 # Control logging with this one line:
 logging.basicConfig(level=logging.DEBUG if settings.debug else logging.INFO)
@@ -31,6 +31,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+#Test Mailgun
+# MailService.send_email("Test from FastAPI", "Mailgun test message")
 
 
 # Include auth router with prefix
