@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from starlette import status
 
 from dependencies.db_dependency import get_db
 from schemas.user_schema import RegisterRequest, LoginRequest
 from services.auth_service import AuthService
+from utils.ical_utils import generate_ical
 
 auth_router = APIRouter()
 
@@ -33,3 +35,16 @@ def login_user(request: LoginRequest, db: Session = Depends(get_db)):
         )
 
     return result
+
+
+@auth_router.get("/download")
+def download_calendar():
+    ical_data = generate_ical()
+
+    return Response(
+        content=ical_data,
+        media_type="text/calendar",
+        headers={
+            "Content-Disposition": "attachment; filename=poc_event.ics"
+        },
+    )
