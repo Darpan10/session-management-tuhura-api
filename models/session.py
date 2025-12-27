@@ -6,7 +6,6 @@ from core.db_connect import Base
 
 class Session(Base):
     __tablename__ = "sessions"
-    __table_args__ = {"schema": "user"}
 
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String(255), nullable=False)
@@ -22,13 +21,14 @@ class Session(Base):
     capacity = Column(Integer, nullable=False)
     min_age = Column(Integer, nullable=False)
     max_age = Column(Integer, nullable=False)
-    created_by = Column(Integer, ForeignKey("user.users.id"), nullable=False)
+    rrule = Column(Text, nullable=False)  # Precomputed RRULE
+    created_by = Column(Integer, ForeignKey("auth.users.id"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationship to staff members
     staff_members = relationship(
         "User",
-        secondary="user.session_staff",
+        secondary="session_staff",
         backref="assigned_sessions"
     )

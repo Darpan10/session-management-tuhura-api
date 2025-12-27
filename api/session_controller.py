@@ -33,6 +33,7 @@ def _build_session_response(session) -> SessionResponse:
         capacity=session.capacity,
         minAge=session.min_age,
         maxAge=session.max_age,
+        rrule=session.rrule,
         createdBy=session.created_by,
         createdAt=session.created_at,
         updatedAt=session.updated_at,

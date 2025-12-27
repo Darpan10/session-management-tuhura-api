@@ -7,6 +7,7 @@ from models.session import Session as SessionModel
 from models.session_staff import SessionStaff
 from models.user.user import User
 from schemas.session_schema import CreateSessionRequest, UpdateSessionRequest, SessionResponse
+from utils.rrule_util import generate_rrule
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +15,8 @@ logger = logging.getLogger(__name__)
 class SessionService:
     def __init__(self, db: Session):
         self.db = db
+
+    # TODO: yet to send staff id from front end - session staff table not being populated
 
     def create_session(self, request: CreateSessionRequest, user_id: int) -> SessionModel:
         """Create a new session"""
@@ -37,6 +40,13 @@ class SessionService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Maximum age must be greater than minimum age"
             )
+        rrule_str = generate_rrule(
+            start_date=request.startDate,
+            end_date=request.endDate,
+            start_time=request.startTime,
+            end_time=request.endTime,
+            day_of_week=request.dayOfWeek  # e.g. "Thursday"
+        )
 
         try:
             session = SessionModel(
@@ -53,6 +63,7 @@ class SessionService:
                 capacity=request.capacity,
                 min_age=request.minAge,
                 max_age=request.maxAge,
+                rrule=rrule_str,
                 created_by=user_id
             )
 
