@@ -164,6 +164,15 @@ class SessionService:
                     detail="Maximum age must be greater than minimum age"
                 )
 
+            rrule_str = generate_rrule(
+                start_date=request.startDate,
+                end_date=request.endDate,
+                start_time=request.startTime,
+                end_time=request.endTime,
+                day_of_week=request.dayOfWeek  # e.g. "Thursday"
+            )
+            session.rrule=rrule_str
+
             # Update staff assignments if provided
             if request.staffIds is not None:
                 self._assign_staff_to_session(session.id, request.staffIds)

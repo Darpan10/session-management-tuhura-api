@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 import os
 
 from api.auth_controller import auth_router
+from api.calendar_controller import calendar_router
 from api.session_controller import session_router
 from config import settings
 from core.db_connect import Base, engine
@@ -64,3 +65,4 @@ app.add_middleware(
 # Include auth router with prefix
 app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
 app.include_router(session_router, prefix="/api/sessions", tags=["sessions"])
+app.include_router(calendar_router, prefix="/api/calendar", tags=["calendar"])
