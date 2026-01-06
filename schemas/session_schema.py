@@ -68,7 +68,7 @@ class SessionResponse(BaseModel):
     capacity: int
     minAge: int
     maxAge: int
-    rrule: Optional[str] = None
+    rrule: str
     createdBy: int
     createdAt: datetime
     updatedAt: Optional[datetime] = None
