@@ -1,0 +1,113 @@
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from typing import List
+
+from dependencies.db_dependency import get_db
+from schemas.waitlist_schema import (
+    StudentSignupRequest,
+    WaitlistResponse,
+    WaitlistEntryWithDetails,
+    StudentResponse,
+    StudentUpdateRequest
+)
+from services.waitlist_service import WaitlistService
+from utils.jwt_utils import get_current_user
+from models.waitlist import WaitlistStatus
+
+waitlist_router = APIRouter()
+
+
+@waitlist_router.post("/signup", response_model=WaitlistResponse, status_code=status.HTTP_201_CREATED)
+def student_signup(
+    request: StudentSignupRequest,
+    db: Session = Depends(get_db)
+):
+    """Public endpoint for student signup (no authentication required)"""
+    waitlist_service = WaitlistService(db)
+    waitlist_entry = waitlist_service.create_signup(request)
+    
+    return WaitlistResponse(
+        id=waitlist_entry.id,
+        student_id=waitlist_entry.student_id,
+        session_id=waitlist_entry.session_id,
+        consent_share_details=waitlist_entry.consent_share_details,
+        consent_photos=waitlist_entry.consent_photos,
+        heard_from=waitlist_entry.heard_from,
+        heard_from_other=waitlist_entry.heard_from_other,
+        newsletter_subscribe=waitlist_entry.newsletter_subscribe,
+        status=waitlist_entry.status,
+        created_at=waitlist_entry.created_at
+    )
+
+
+@waitlist_router.get("/session/{session_id}", response_model=List[WaitlistEntryWithDetails])
+def get_session_waitlist(
+    session_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Get all waitlist entries for a specific session (requires authentication)"""
+    waitlist_service = WaitlistService(db)
+    return waitlist_service.get_waitlist_by_session(session_id)
+
+
+@waitlist_router.patch("/{waitlist_id}/status", response_model=WaitlistResponse)
+def update_waitlist_status(
+    waitlist_id: int,
+    new_status: WaitlistStatus,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Update waitlist entry status (requires authentication)"""
+    waitlist_service = WaitlistService(db)
+    waitlist_entry = waitlist_service.update_waitlist_status(waitlist_id, new_status)
+    
+    return WaitlistResponse(
+        id=waitlist_entry.id,
+        student_id=waitlist_entry.student_id,
+        session_id=waitlist_entry.session_id,
+        consent_share_details=waitlist_entry.consent_share_details,
+        consent_photos=waitlist_entry.consent_photos,
+        heard_from=waitlist_entry.heard_from,
+        heard_from_other=waitlist_entry.heard_from_other,
+        newsletter_subscribe=waitlist_entry.newsletter_subscribe,
+        status=waitlist_entry.status,
+        created_at=waitlist_entry.created_at
+    )
+
+
+@waitlist_router.get("/students", response_model=List[StudentResponse])
+def get_all_students(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Get all students who have signed up (requires authentication)"""
+    waitlist_service = WaitlistService(db)
+    return waitlist_service.get_all_students()
+
+
+@waitlist_router.get("/students/{student_id}", response_model=StudentResponse)
+def get_student_by_id(
+    student_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Get a specific student's details (requires authentication)"""
+    waitlist_service = WaitlistService(db)
+    student = waitlist_service.get_student_by_id(student_id)
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+    return student
+
+
+@waitlist_router.put("/students/{student_id}", response_model=StudentResponse)
+def update_student(
+    student_id: int,
+    request: StudentUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Update student details (requires authentication)"""
+    waitlist_service = WaitlistService(db)
+    return waitlist_service.update_student(student_id, request)
+
