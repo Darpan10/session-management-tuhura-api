@@ -1,20 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from starlette import status
-from pydantic import BaseModel
 
 from dependencies.db_dependency import get_db
 from schemas.user_schema import RegisterRequest, LoginRequest
 from services.auth_service import AuthService
-from utils.jwt_utils import get_current_user
 
 auth_router = APIRouter()
-
-
-# Pydantic model for password change request
-class ChangePasswordRequest(BaseModel):
-    current_password: str
-    new_password: str
 
 
 @auth_router.post("/register")
@@ -40,23 +32,4 @@ def login_user(request: LoginRequest, db: Session = Depends(get_db)):
             detail="Invalid email or password"
         )
 
-    return result
-
-
-@auth_router.post("/change-password")
-def change_password(
-    request: ChangePasswordRequest,
-    current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Change password for authenticated user."""
-    auth_service = AuthService(db)
-    user_id = current_user["user_id"]
-    
-    result = auth_service.change_password(
-        user_id=user_id,
-        current_password=request.current_password,
-        new_password=request.new_password
-    )
-    
     return result
