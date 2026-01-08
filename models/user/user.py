@@ -5,7 +5,7 @@ from core.db_connect import Base
 
 class User(Base):
     __tablename__ = "users"
-    __table_args__ = {"schema": "auth"}
+    __table_args__ = {"schema": "user"}
 
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
@@ -13,4 +13,4 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    roles = relationship("Role", secondary="auth.user_roles", back_populates="users")
+    roles = relationship("Role", secondary="user.user_roles", back_populates="users")

@@ -22,7 +22,7 @@ class Session(Base):
     min_age = Column(Integer, nullable=False)
     max_age = Column(Integer, nullable=False)
     rrule = Column(Text, nullable=False)  # Precomputed RRULE
-    created_by = Column(Integer, ForeignKey("auth.users.id"), nullable=False)
+    created_by = Column(Integer, ForeignKey("user.users.id"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
