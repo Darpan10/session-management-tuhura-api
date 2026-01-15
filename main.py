@@ -9,12 +9,18 @@ import os
 from api.auth_controller import auth_router
 from api.calendar_controller import calendar_router
 from api.session_controller import session_router
+from api.waitlist_controller import waitlist_router
+from api.attendance_controller import router as attendance_router
 from config import settings
 from core.db_connect import Base, engine
 import logging
 
 from models.user import User,Role,UserRole
 from models.session import Session
+from models.session_staff import SessionStaff
+from models.student import Student
+from models.waitlist import Waitlist
+from models.attendance import Attendance
 from services.mail_service import MailService
 
 # Control logging with this one line:
@@ -42,12 +48,21 @@ async def startup_event():
     except Exception as e:
         logging.error(f"✗ Failed to connect to Supabase database: {e}")
 
-# Automatically create schema if it doesn't exist
-event.listen(Base.metadata, "before_create", lambda target, connection, **kw: connection.execute(CreateSchema("auth", if_not_exists=True)))
+# Automatically create schemas if they don't exist
+event.listen(Base.metadata, "before_create", lambda target, connection, **kw: connection.execute(CreateSchema("user", if_not_exists=True)))
+# event.listen(Base.metadata, "before_create", lambda target, connection, **kw: connection.execute(CreateSchema("session", if_not_exists=True)))
+# event.listen(Base.metadata, "before_create", lambda target, connection, **kw: connection.execute(CreateSchema("student", if_not_exists=True)))
+# event.listen(Base.metadata, "before_create", lambda target, connection, **kw: connection.execute(CreateSchema("student", if_not_exists=True)))
+#
 
-
-# Create tables
-Base.metadata.create_all(bind=engine)
+# Create tables - wrap in try/except to handle permission issues if tables already exist
+try:
+    Base.metadata.create_all(bind=engine, checkfirst=True)
+    logging.info("✓ Database tables verified/created successfully")
+except Exception as e:
+    # Tables likely already exist but user lacks CREATE permission - this is okay
+    logging.warning(f"Could not create tables (likely already exist): {e}")
+    logging.info("Continuing - tables should already exist in database")
 
 
 #FastAPI CORS Setup
@@ -66,3 +81,5 @@ app.add_middleware(
 app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
 app.include_router(session_router, prefix="/api/sessions", tags=["sessions"])
 app.include_router(calendar_router, prefix="/api/calendar", tags=["calendar"])
+app.include_router(waitlist_router, prefix="/api/waitlist", tags=["waitlist"])
+app.include_router(attendance_router)

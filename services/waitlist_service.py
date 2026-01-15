@@ -1,0 +1,394 @@
+from sqlalchemy.orm import Session
+from fastapi import HTTPException, status
+import logging
+from typing import List
+
+from models.student import Student
+from models.waitlist import Waitlist, WaitlistStatus
+from models.session import Session as SessionModel
+from schemas.waitlist_schema import StudentSignupRequest, WaitlistEntryWithDetails, StudentResponse, \
+    StudentUpdateRequest
+
+logger = logging.getLogger(__name__)
+
+
+class WaitlistService:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def create_signup(self, request: StudentSignupRequest) -> Waitlist:
+        """Create a new student signup and add to waitlist"""
+        try:
+            # Check if session exists
+            session = self.db.query(SessionModel).filter(SessionModel.id == request.session_id).first()
+            if not session:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Session with ID {request.session_id} not found"
+                )
+
+            # Check if student already exists by email
+            student = self.db.query(Student).filter(Student.email == request.email).first()
+
+            if student:
+                # Check if student is already on waitlist for this session
+                existing_waitlist = self.db.query(Waitlist).filter(
+                    Waitlist.student_id == student.id,
+                    Waitlist.session_id == request.session_id
+                ).first()
+
+                if existing_waitlist:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Student is already registered for this session"
+                    )
+
+                # Update existing student details
+                student.first_name = request.first_name
+                student.family_name = request.family_name
+                student.school_year = request.school_year
+                student.school_year_other = request.school_year_other
+                student.experience = request.experience
+                student.needs_device = request.needs_device
+                student.medical_info = request.medical_info
+                student.parent_name = request.parent_name
+                student.parent_phone = request.parent_phone
+            else:
+                # Create new student
+                student = Student(
+                    email=request.email,
+                    first_name=request.first_name,
+                    family_name=request.family_name,
+                    school_year=request.school_year,
+                    school_year_other=request.school_year_other,
+                    experience=request.experience,
+                    needs_device=request.needs_device,
+                    medical_info=request.medical_info,
+                    parent_name=request.parent_name,
+                    parent_phone=request.parent_phone
+                )
+                self.db.add(student)
+                self.db.flush()  # Get student.id
+
+            # Create waitlist entry
+            waitlist_entry = Waitlist(
+                student_id=student.id,
+                session_id=request.session_id,
+                consent_share_details=request.consent_share_details,
+                consent_photos=request.consent_photos,
+                heard_from=request.heard_from,
+                heard_from_other=request.heard_from_other,
+                newsletter_subscribe=request.newsletter_subscribe,
+                status=WaitlistStatus.WAITLIST
+            )
+
+            self.db.add(waitlist_entry)
+            self.db.commit()
+            self.db.refresh(waitlist_entry)
+
+            logger.info(f"Student {student.email} added to waitlist for session {request.session_id}")
+            return waitlist_entry
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"Failed to create signup: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to create signup"
+            )
+
+    def get_waitlist_by_session(self, session_id: int) -> List[WaitlistEntryWithDetails]:
+        """Get all waitlist entries for a specific session"""
+        try:
+            results = (
+                self.db.query(
+                    Waitlist.id,
+                    Student.first_name,
+                    Student.family_name,
+                    Student.email,
+                    Student.parent_name,
+                    Student.parent_phone,
+                    Student.school_year,
+                    Student.needs_device,
+                    Waitlist.status,
+                    Waitlist.created_at
+                )
+                .join(Student, Waitlist.student_id == Student.id)
+                .filter(Waitlist.session_id == session_id)
+                .order_by(Waitlist.created_at.asc())
+                .all()
+            )
+
+            return [
+                WaitlistEntryWithDetails(
+                    id=r.id,
+                    student_name=f"{r.first_name} {r.family_name}",
+                    student_email=r.email,
+                    parent_name=r.parent_name,
+                    parent_phone=r.parent_phone,
+                    school_year=r.school_year,
+                    needs_device=r.needs_device,
+                    status=r.status,
+                    created_at=r.created_at
+                )
+                for r in results
+            ]
+        except Exception as e:
+            logger.error(f"Failed to fetch waitlist: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to fetch waitlist"
+            )
+
+    def update_waitlist_status(self, waitlist_id: int, new_status: WaitlistStatus) -> Waitlist:
+        """Update waitlist entry status"""
+        try:
+            waitlist_entry = self.db.query(Waitlist).filter(Waitlist.id == waitlist_id).first()
+
+            if not waitlist_entry:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Waitlist entry with ID {waitlist_id} not found"
+                )
+
+            waitlist_entry.status = new_status
+            self.db.commit()
+            self.db.refresh(waitlist_entry)
+
+            logger.info(f"Waitlist entry {waitlist_id} status updated to {new_status}")
+            return waitlist_entry
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"Failed to update waitlist status: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to update waitlist status"
+            )
+
+    def get_all_students(self) -> List[StudentResponse]:
+        """Get all students"""
+        try:
+            students = self.db.query(Student).order_by(Student.created_at.desc()).all()
+            return [StudentResponse.from_orm(student) for student in students]
+        except Exception as e:
+            logger.error(f"Failed to fetch students: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to fetch students"
+            )
+
+    def get_student_by_id(self, student_id: int) -> StudentResponse:
+        """Get a specific student by ID"""
+        try:
+            student = self.db.query(Student).filter(Student.id == student_id).first()
+            if not student:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Student with ID {student_id} not found"
+                )
+            return StudentResponse.from_orm(student)
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Failed to fetch student: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to fetch student"
+            )
+
+    def update_student(self, student_id: int, request: StudentUpdateRequest) -> StudentResponse:
+        """Update student details"""
+        try:
+            student = self.db.query(Student).filter(Student.id == student_id).first()
+            if not student:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Student with ID {student_id} not found"
+                )
+
+            # Update student fields
+            student.email = request.email
+            student.first_name = request.first_name
+            student.family_name = request.family_name
+            student.school_year = request.school_year
+            student.school_year_other = request.school_year_other
+            student.experience = request.experience
+            student.needs_device = request.needs_device
+            student.medical_info = request.medical_info
+            student.parent_name = request.parent_name
+            student.parent_phone = request.parent_phone
+
+            self.db.commit()
+            self.db.refresh(student)
+
+            logger.info(f"Student {student_id} details updated")
+            return StudentResponse.from_orm(student)
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"Failed to update student: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to update student"
+            )
+
+    def bulk_update_status(self, waitlist_ids: List[int], new_status: WaitlistStatus) -> int:
+        """Update status for multiple waitlist entries"""
+        try:
+            # Verify all waitlist IDs exist
+            waitlist_entries = self.db.query(Waitlist).filter(Waitlist.id.in_(waitlist_ids)).all()
+            
+            if len(waitlist_entries) != len(waitlist_ids):
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="One or more waitlist entries not found"
+                )
+
+            # Update status for all entries
+            updated_count = (
+                self.db.query(Waitlist)
+                .filter(Waitlist.id.in_(waitlist_ids))
+                .update({Waitlist.status: new_status}, synchronize_session=False)
+            )
+
+            self.db.commit()
+            logger.info(f"Updated {updated_count} waitlist entries to status {new_status}")
+            return updated_count
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"Failed to bulk update status: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to bulk update status"
+            )
+
+    def get_waitlist_by_status(self, session_id: int, status: WaitlistStatus) -> List[WaitlistEntryWithDetails]:
+        """Get waitlist entries for a specific session filtered by status"""
+        try:
+            results = (
+                self.db.query(
+                    Waitlist.id,
+                    Student.first_name,
+                    Student.family_name,
+                    Student.email,
+                    Student.parent_name,
+                    Student.parent_phone,
+                    Student.school_year,
+                    Student.needs_device,
+                    Waitlist.status,
+                    Waitlist.created_at
+                )
+                .join(Student, Waitlist.student_id == Student.id)
+                .filter(Waitlist.session_id == session_id, Waitlist.status == status)
+                .order_by(Waitlist.created_at.asc())
+                .all()
+            )
+
+            return [
+                WaitlistEntryWithDetails(
+                    id=r.id,
+                    student_name=f"{r.first_name} {r.family_name}",
+                    student_email=r.email,
+                    parent_name=r.parent_name,
+                    parent_phone=r.parent_phone,
+                    school_year=r.school_year,
+                    needs_device=r.needs_device,
+                    status=r.status,
+                    created_at=r.created_at
+                )
+                for r in results
+            ]
+        except Exception as e:
+            logger.error(f"Failed to fetch waitlist by status: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to fetch waitlist by status"
+            )
+
+    def get_admitted_count(self, session_id: int) -> int:
+        """Get count of admitted students for a specific session"""
+        try:
+            count = (
+                self.db.query(Waitlist)
+                .filter(Waitlist.session_id == session_id, Waitlist.status == WaitlistStatus.ADMITTED)
+                .count()
+            )
+            return count
+        except Exception as e:
+            logger.error(f"Failed to get admitted count: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to get admitted count"
+            )
+
+    def get_waitlist_entry_by_id(self, waitlist_id: int) -> WaitlistEntryWithDetails:
+        """Get detailed information for a specific waitlist entry"""
+        try:
+            result = (
+                self.db.query(
+                    Waitlist.id,
+                    Waitlist.student_id,
+                    Student.first_name,
+                    Student.family_name,
+                    Student.email,
+                    Student.parent_name,
+                    Student.parent_phone,
+                    Student.school_year,
+                    Student.school_year_other,
+                    Student.experience,
+                    Student.needs_device,
+                    Student.medical_info,
+                    Waitlist.consent_share_details,
+                    Waitlist.consent_photos,
+                    Waitlist.heard_from,
+                    Waitlist.heard_from_other,
+                    Waitlist.newsletter_subscribe,
+                    Waitlist.status,
+                    Waitlist.created_at
+                )
+                .join(Student, Waitlist.student_id == Student.id)
+                .filter(Waitlist.id == waitlist_id)
+                .first()
+            )
+
+            if not result:
+                return None
+
+            return WaitlistEntryWithDetails(
+                id=result.id,
+                student_id=result.student_id,
+                first_name=result.first_name,
+                family_name=result.family_name,
+                student_name=f"{result.first_name} {result.family_name}",
+                student_email=result.email,
+                parent_name=result.parent_name,
+                parent_phone=result.parent_phone,
+                school_year=result.school_year,
+                school_year_other=result.school_year_other,
+                experience=result.experience or [],
+                needs_device=result.needs_device,
+                medical_info=result.medical_info,
+                consent_share_details=result.consent_share_details,
+                consent_photos=result.consent_photos,
+                heard_from=result.heard_from,
+                heard_from_other=result.heard_from_other,
+                newsletter_subscribe=result.newsletter_subscribe,
+                status=result.status,
+                created_at=result.created_at
+            )
+        except Exception as e:
+            logger.error(f"Failed to fetch waitlist entry: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to fetch waitlist entry"
+            )

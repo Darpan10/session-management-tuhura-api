@@ -9,5 +9,5 @@ class SessionStaff(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     session_id = Column(Integer, ForeignKey("sessions.id", ondelete="CASCADE"), nullable=False)
-    staff_id = Column(Integer, ForeignKey("auth.users.id", ondelete="CASCADE"), nullable=False)
+    staff_id = Column(Integer, ForeignKey("user.users.id", ondelete="CASCADE"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
