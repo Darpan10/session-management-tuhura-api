@@ -8,7 +8,9 @@ from schemas.waitlist_schema import (
     WaitlistResponse,
     WaitlistEntryWithDetails,
     StudentResponse,
-    StudentUpdateRequest
+    StudentUpdateRequest,
+    BulkStatusUpdateRequest,
+    BulkStatusUpdateResponse
 )
 from services.waitlist_service import WaitlistService
 from utils.jwt_utils import get_current_user
@@ -111,3 +113,65 @@ def update_student(
     waitlist_service = WaitlistService(db)
     return waitlist_service.update_student(student_id, request)
 
+
+@waitlist_router.post("/bulk-status", response_model=BulkStatusUpdateResponse)
+def bulk_update_status(
+        request: BulkStatusUpdateRequest,
+        db: Session = Depends(get_db),
+        current_user: dict = Depends(get_current_user)
+):
+    """Update status for multiple waitlist entries (requires authentication)"""
+    waitlist_service = WaitlistService(db)
+    status_enum = WaitlistStatus(request.new_status)
+    updated_count = waitlist_service.bulk_update_status(request.waitlist_ids, status_enum)
+
+    return BulkStatusUpdateResponse(
+        updated_count=updated_count,
+        message=f"Successfully updated {updated_count} waitlist entries to {request.new_status}"
+    )
+
+
+@waitlist_router.get("/session/{session_id}/status/{status_value}", response_model=List[WaitlistEntryWithDetails])
+def get_waitlist_by_status(
+        session_id: int,
+        status_value: str,
+        db: Session = Depends(get_db),
+        current_user: dict = Depends(get_current_user)
+):
+    """Get waitlist entries for a specific session filtered by status (requires authentication)"""
+    try:
+        status_enum = WaitlistStatus(status_value)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid status value. Must be one of: waitlist, admitted, withdrawn"
+        )
+
+    waitlist_service = WaitlistService(db)
+    return waitlist_service.get_waitlist_by_status(session_id, status_enum)
+
+
+@waitlist_router.get("/session/{session_id}/admitted-count")
+def get_admitted_count(
+        session_id: int,
+        db: Session = Depends(get_db),
+        current_user: dict = Depends(get_current_user)
+):
+    """Get count of admitted students for a specific session (requires authentication)"""
+    waitlist_service = WaitlistService(db)
+    count = waitlist_service.get_admitted_count(session_id)
+    return {"session_id": session_id, "admitted_count": count}
+
+
+@waitlist_router.get("/{waitlist_id}", response_model=WaitlistEntryWithDetails)
+def get_waitlist_entry(
+        waitlist_id: int,
+        db: Session = Depends(get_db),
+        current_user: dict = Depends(get_current_user)
+):
+    """Get detailed information for a specific waitlist entry (requires authentication)"""
+    waitlist_service = WaitlistService(db)
+    entry = waitlist_service.get_waitlist_entry_by_id(waitlist_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Waitlist entry not found")
+    return entry

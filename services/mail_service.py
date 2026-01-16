@@ -16,8 +16,8 @@ class MailService:
         auth = ("api", settings.mailgun_api_key)
 
         data = {
-            "from": "postmaster@sandbox22a538fa42b349959ca958e7f30a4257.mailgun.org",
-            "to": "techtuhura@gmail.com",
+            "from": f"Mailgun Sandbox <postmaster@{settings.mailgun_domain}>",
+            "to": "Tuhura Tech <tuhuratech2@gmail.com>",
             "subject": subject,
             "text": text
         }

@@ -7,8 +7,8 @@ import enum
 
 class WaitlistStatus(str, enum.Enum):
     WAITLIST = "waitlist"
-    ENROLLED = "enrolled"
-    CANCELLED = "cancelled"
+    ADMITTED = "admitted"
+    WITHDRAWN = "withdrawn"
 
 
 class HeardFrom(str, enum.Enum):
@@ -35,14 +35,14 @@ class Waitlist(Base):
     consent_photos = Column(Boolean, nullable=False)
 
     # How did you hear about us
-    heard_from = Column(SQLEnum(HeardFrom), nullable=False)
+    heard_from = Column(SQLEnum(HeardFrom, values_callable=lambda x: [e.value for e in x]), nullable=False)
     heard_from_other = Column(String, nullable=True)  # For "Other" option
 
     # Newsletter subscription
     newsletter_subscribe = Column(Boolean, nullable=False)
 
     # Status
-    status = Column(SQLEnum(WaitlistStatus), default=WaitlistStatus.WAITLIST, nullable=False)
+    status = Column(SQLEnum(WaitlistStatus, values_callable=lambda x: [e.value for e in x]), default=WaitlistStatus.WAITLIST, nullable=False)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

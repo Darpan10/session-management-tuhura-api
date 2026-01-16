@@ -32,3 +32,6 @@ class Session(Base):
         secondary="session_staff",
         backref="assigned_sessions"
     )
+
+    # Relationship to attendance records
+    attendance_records = relationship("Attendance", back_populates="session", cascade="all, delete-orphan")
