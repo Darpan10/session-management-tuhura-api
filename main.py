@@ -1,5 +1,4 @@
 from fastapi import FastAPI
-from mashumaro.helper import DateTimeDeserializationEngine
 from sqlalchemy import event
 from sqlalchemy.sql.ddl import CreateSchema
 from starlette.middleware.cors import CORSMiddleware
@@ -7,19 +6,25 @@ import psycopg2
 from dotenv import load_dotenv
 import os
 
-from api.attendance_controller import attendance_router
 from api.auth_controller import auth_router
 from api.calendar_controller import calendar_router
 from api.session_controller import session_router
 from api.waitlist_controller import waitlist_router
+from api.attendance_controller import router as attendance_router
+from api.term_controller import term_router
+from api.config_controller import router as config_router
 from config import settings
 from core.db_connect import Base, engine
 import logging
 
 from models.user import User,Role,UserRole
 from models.session import Session
+from models.session_term import SessionTerm
+from models.term import Term
+from models.session_staff import SessionStaff
 from models.student import Student
 from models.waitlist import Waitlist
+from models.attendance import Attendance
 from services.mail_service import MailService
 
 # Control logging with this one line:
@@ -67,7 +72,14 @@ except Exception as e:
 #FastAPI CORS Setup
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000","http://localhost:3001", "http://127.0.0.1:3000", "http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:3001", 
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
+        "http://localhost:5173", 
+        "http://127.0.0.1:5173"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -81,4 +93,6 @@ app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
 app.include_router(session_router, prefix="/api/sessions", tags=["sessions"])
 app.include_router(calendar_router, prefix="/api/calendar", tags=["calendar"])
 app.include_router(waitlist_router, prefix="/api/waitlist", tags=["waitlist"])
-app.include_router(attendance_router, prefix="/api/attendance", tags=["Attendance"])
+app.include_router(term_router, prefix="/api/terms", tags=["terms"])
+app.include_router(attendance_router)
+app.include_router(config_router)

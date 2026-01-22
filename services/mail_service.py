@@ -10,7 +10,7 @@ class MailService:
         """Send an email through Mailgun API"""
 
         # Build Mailgun endpoint
-        url = f"{settings.mailgun_base_url}/{settings.mailgun_domain}/messages"
+        url = f"{settings.mailgun_base_url}/v3/{settings.mailgun_domain}/messages"
 
         # Auth uses API key from .env
         auth = ("api", settings.mailgun_api_key)

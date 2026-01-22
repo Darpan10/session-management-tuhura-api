@@ -8,7 +8,8 @@ from schemas.session_schema import (
     UpdateSessionRequest,
     SessionResponse,
     CreateSessionResponse,
-    StaffMember
+    StaffMember,
+    TermDetail
 )
 from services.session_service import SessionService
 from utils.jwt_utils import get_current_user
@@ -17,11 +18,23 @@ session_router = APIRouter()
 
 
 def _build_session_response(session) -> SessionResponse:
-    """Helper to build SessionResponse with staff members"""
+    """Helper to build SessionResponse with staff members and term details"""
     return SessionResponse(
         id=session.id,
         title=session.title,
-        term=session.term,
+        description=session.description,
+        termIds=[term.id for term in session.terms],
+        termNames=[term.name for term in session.terms],
+        terms=[
+            TermDetail(
+                id=term.id,
+                name=term.name,
+                startDate=term.start_date,
+                endDate=term.end_date,
+                year=term.year
+            )
+            for term in session.terms
+        ],
         dayOfWeek=session.day_of_week,
         startDate=session.start_date,
         endDate=session.end_date,
@@ -34,6 +47,7 @@ def _build_session_response(session) -> SessionResponse:
         minAge=session.min_age,
         maxAge=session.max_age,
         rrule=session.rrule,
+        isDeleted=session.is_deleted,
         createdBy=session.created_by,
         createdAt=session.created_at,
         updatedAt=session.updated_at,

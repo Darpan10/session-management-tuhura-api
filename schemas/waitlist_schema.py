@@ -135,5 +135,30 @@ class BulkStatusUpdateResponse(BaseModel):
     updated_count: int
     message: str
 
+class SessionStudentCount(BaseModel):
+    """Session with student count for a specific status"""
+    id: int
+    title: str
+    term: str
+    dayOfWeek: str = Field(alias='day_of_week')
+    startDate: str = Field(alias='start_date')
+    endDate: str = Field(alias='end_date')
+    startTime: str = Field(alias='start_time')
+    endTime: str = Field(alias='end_time')
+    location: str
+    city: str
+    studentCount: int = Field(alias='student_count')
+    
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+        by_alias = False  # Serialize using field names (camelCase), not aliases (snake_case)
+
+class AllSessionsStudentCountResponse(BaseModel):
+    """Response with all sessions and their student counts for a status"""
+    status: str
+    totalStudents: int
+    sessions: List[SessionStudentCount]
+
     class Config:
         from_attributes = True

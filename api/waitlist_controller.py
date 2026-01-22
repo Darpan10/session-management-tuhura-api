@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
+import logging
 
 from dependencies.db_dependency import get_db
 from schemas.waitlist_schema import (
@@ -10,12 +11,15 @@ from schemas.waitlist_schema import (
     StudentResponse,
     StudentUpdateRequest,
     BulkStatusUpdateRequest,
-    BulkStatusUpdateResponse
+    BulkStatusUpdateResponse,
+    SessionStudentCount,
+    AllSessionsStudentCountResponse
 )
 from services.waitlist_service import WaitlistService
 from utils.jwt_utils import get_current_user
 from models.waitlist import WaitlistStatus
 
+logger = logging.getLogger(__name__)
 waitlist_router = APIRouter()
 
 
@@ -124,7 +128,7 @@ def bulk_update_status(
     waitlist_service = WaitlistService(db)
     status_enum = WaitlistStatus(request.new_status)
     updated_count = waitlist_service.bulk_update_status(request.waitlist_ids, status_enum)
-
+    
     return BulkStatusUpdateResponse(
         updated_count=updated_count,
         message=f"Successfully updated {updated_count} waitlist entries to {request.new_status}"
@@ -146,7 +150,7 @@ def get_waitlist_by_status(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid status value. Must be one of: waitlist, admitted, withdrawn"
         )
-
+    
     waitlist_service = WaitlistService(db)
     return waitlist_service.get_waitlist_by_status(session_id, status_enum)
 
@@ -175,3 +179,57 @@ def get_waitlist_entry(
     if not entry:
         raise HTTPException(status_code=404, detail="Waitlist entry not found")
     return entry
+
+
+@waitlist_router.get("/all-sessions/status/{status_value}")
+def get_all_sessions_with_student_counts(
+        status_value: str,
+        db: Session = Depends(get_db),
+        current_user: dict = Depends(get_current_user)
+):
+    """OPTIMIZED: Get all sessions with student counts for a status in ONE API call"""
+    try:
+        status_enum = WaitlistStatus(status_value)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid status value. Must be one of: waitlist, admitted, withdrawn"
+        )
+    
+    waitlist_service = WaitlistService(db)
+    results = waitlist_service.get_all_sessions_with_student_counts(status_enum)
+    logger.info(f"Found {len(results)} sessions with status {status_value}")
+    
+    # Transform results to response format
+    sessions = []
+    total_students = 0
+    
+    for result in results:
+        logger.info(f"Session {result.id}: {result.title}, count: {result.student_count}")
+        # Use camelCase directly to match frontend expectations
+        session_dict = {
+            'id': result.id,
+            'title': result.title,
+            'term': result.term,
+            'dayOfWeek': result.day_of_week,  # Use camelCase
+            'startDate': str(result.start_date),
+            'endDate': str(result.end_date),
+            'startTime': str(result.start_time),
+            'endTime': str(result.end_time),
+            'location': result.location,
+            'city': result.city,
+            'studentCount': result.student_count  # Use camelCase
+        }
+        sessions.append(session_dict)
+        total_students += result.student_count
+    
+    response = {
+        'status': status_value,
+        'totalStudents': total_students,
+        'sessions': sessions
+    }
+    
+    logger.info(f"Returning {len(sessions)} sessions, total students: {total_students}")
+    return response
+
+

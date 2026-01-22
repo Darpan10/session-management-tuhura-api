@@ -244,7 +244,7 @@ class WaitlistService:
         try:
             # Verify all waitlist IDs exist
             waitlist_entries = self.db.query(Waitlist).filter(Waitlist.id.in_(waitlist_ids)).all()
-
+            
             if len(waitlist_entries) != len(waitlist_ids):
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
@@ -391,4 +391,58 @@ class WaitlistService:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to fetch waitlist entry"
+            )
+
+    def get_all_sessions_with_student_counts(self, status_filter: WaitlistStatus):
+        """Optimized endpoint - Get all sessions with student counts for a specific status in ONE query"""
+        from sqlalchemy import func, and_
+        
+        try:
+            # Single query with JOIN and GROUP BY - much faster than N queries
+            results = (
+                self.db.query(
+                    SessionModel.id,
+                    SessionModel.title,
+                    SessionModel.term,
+                    SessionModel.day_of_week,
+                    SessionModel.start_date,
+                    SessionModel.end_date,
+                    SessionModel.start_time,
+                    SessionModel.end_time,
+                    SessionModel.location,
+                    SessionModel.city,
+                    func.count(Waitlist.id).label('student_count')
+                )
+                .join(
+                    Waitlist,
+                    and_(
+                        SessionModel.id == Waitlist.session_id,
+                        Waitlist.status == status_filter
+                    )
+                )
+                .filter(SessionModel.is_deleted == False)  # Only active sessions
+                .group_by(
+                    SessionModel.id,
+                    SessionModel.title,
+                    SessionModel.term,
+                    SessionModel.day_of_week,
+                    SessionModel.start_date,
+                    SessionModel.end_date,
+                    SessionModel.start_time,
+                    SessionModel.end_time,
+                    SessionModel.location,
+                    SessionModel.city
+                )
+                .having(func.count(Waitlist.id) > 0)  # Only sessions with students
+                .order_by(func.count(Waitlist.id).desc())  # Order by student count
+                .all()
+            )
+            
+            return results
+            
+        except Exception as e:
+            logger.error(f"Failed to fetch sessions with student counts: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to fetch sessions data"
             )

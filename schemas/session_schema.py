@@ -3,6 +3,18 @@ from datetime import date, time, datetime
 from typing import Optional, List
 
 
+class TermDetail(BaseModel):
+    """Term with dates for session response"""
+    id: int
+    name: str
+    startDate: date
+    endDate: date
+    year: int
+
+    class Config:
+        from_attributes = True
+
+
 class StaffMember(BaseModel):
     """Simple staff member representation"""
     id: int
@@ -15,10 +27,9 @@ class StaffMember(BaseModel):
 
 class CreateSessionRequest(BaseModel):
     title: str = Field(..., min_length=3, max_length=255)
-    term: str = Field(..., min_length=1, max_length=50)
+    description: Optional[str] = Field(None, max_length=5000)
+    termIds: List[int] = Field(..., min_items=1, alias="termIds")
     dayOfWeek: str = Field(..., min_length=1, max_length=20, alias="dayOfWeek")
-    startDate: date = Field(..., alias="startDate")
-    endDate: date = Field(..., alias="endDate")
     startTime: time = Field(..., alias="startTime")
     endTime: time = Field(..., alias="endTime")
     location: str = Field(..., min_length=3, max_length=500)
@@ -35,10 +46,9 @@ class CreateSessionRequest(BaseModel):
 
 class UpdateSessionRequest(BaseModel):
     title: Optional[str] = Field(None, min_length=3, max_length=255)
-    term: Optional[str] = Field(None, min_length=1, max_length=50)
+    description: Optional[str] = Field(None, max_length=5000)
+    termIds: Optional[List[int]] = Field(None, min_items=1, alias="termIds")
     dayOfWeek: Optional[str] = Field(None, min_length=1, max_length=20, alias="dayOfWeek")
-    startDate: Optional[date] = Field(None, alias="startDate")
-    endDate: Optional[date] = Field(None, alias="endDate")
     startTime: Optional[time] = Field(None, alias="startTime")
     endTime: Optional[time] = Field(None, alias="endTime")
     location: Optional[str] = Field(None, min_length=3, max_length=500)
@@ -56,7 +66,10 @@ class UpdateSessionRequest(BaseModel):
 class SessionResponse(BaseModel):
     id: int
     title: str
-    term: str
+    description: Optional[str] = None
+    termIds: List[int] = []
+    termNames: List[str] = []
+    terms: List[TermDetail] = []  # Full term details with dates
     dayOfWeek: str
     startDate: date
     endDate: date
@@ -69,6 +82,7 @@ class SessionResponse(BaseModel):
     minAge: int
     maxAge: int
     rrule: str
+    isDeleted: bool
     createdBy: int
     createdAt: datetime
     updatedAt: Optional[datetime] = None
@@ -77,6 +91,13 @@ class SessionResponse(BaseModel):
     class Config:
         from_attributes = True
         populate_by_name = True
+        
+        # This ensures proper serialization to camelCase
+        json_schema_extra = {
+            "example": {
+                "isDeleted": False
+            }
+        }
 
 
 class CreateSessionResponse(BaseModel):

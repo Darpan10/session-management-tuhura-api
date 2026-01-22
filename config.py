@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     mailgun_domain: str
     mailgun_base_url: str
 
+    # Google Maps API
+    google_maps_api_key: str
+
     # Logging
     log_level: str
 
